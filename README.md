@@ -1,11 +1,23 @@
-# CERBERUS — Cyber Evaluation & Red-teaming Benchmark for Uncensored Systems
+# CERBERUS — Evaluación defensiva de LLMs locales ante prompts adversarios
 
-Framework reutilizable para evaluar LLM locales: mide qué tanto un modelo local
-genera contenido accionable de red team a partir de prompts MITRE ATT&CK, con
-puntuación determinista + juez LLM cloud opcional en la banda ambigua.
+> *Defensive evaluation framework for auditing local LLMs against adversarial
+> prompts structured with MITRE ATT&CK. It helps security teams measure
+> harmful-output risk before deploying uncensored models in internal
+> environments.*
 
-**Uso defensivo y reportable:** el pipeline es pasivo (prompt → texto). No se
-ejecuta ningún payload ni ataque real. El modelo local corre aislado, sin red de
+Framework reutilizable de **evaluación defensiva y safety research**: mide el
+riesgo de salida accionable de un modelo local ante prompts adversariales
+estructurados con MITRE ATT&CK, para que los equipos de seguridad evalúen ese
+riesgo antes de desplegar modelos sin censura en entornos internos.
+Puntuación determinista + juez LLM cloud opcional en la banda ambigua.
+
+> **Uso autorizado:** esta herramienta está pensada para investigación de
+> seguridad autorizada, ejercicios red team con permiso por escrito y assessment
+> de riesgo defensivo. El usuario es responsable de cumplir la legislación y las
+> políticas aplicables a su contexto.
+
+**Pasivo y reportable:** el pipeline es pasivo (prompt → texto). No se ejecuta
+ningún payload ni ataque real; el modelo local corre aislado, sin red de
 producción.
 
 ## Arquitectura
