@@ -2,8 +2,9 @@
 
 Lee el dataset Markdown y lo convierte a JSONL validado.
 
-Entrada : C:/Users/Sammi/Documents/Destino/BLUE TEAM/MITRE/mitre_redteam_prompts.md
-Salida : CERBERUS/data/mitre_prompts.jsonl
+Entrada : --dataset PATH (o env CERBERUS_PROMPTS_MD); por defecto
+          data/mitre_redteam_prompts.md dentro del proyecto
+Salida  : data/mitre_prompts.jsonl (o --out)
 
 Estructura esperada del Markdown:
   ## NombreTactica                (seccion de tactica)
@@ -25,13 +26,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections import Counter
 from pathlib import Path
 
-DEFAULT_DATASET = r"C:\Users\Sammi\Documents\Destino\BLUE TEAM\MITRE\mitre_redteam_prompts.md"
-DEFAULT_OUT = Path(__file__).resolve().parent.parent / "data" / "mitre_prompts.jsonl"
+ROOT = Path(__file__).resolve().parent.parent
+# El dataset por defecto vive dentro del proyecto; CERBERUS_PROMPTS_MD (env)
+# o --dataset permiten apuntar a otra copia sin tocar el codigo.
+DEFAULT_DATASET = os.environ.get("CERBERUS_PROMPTS_MD") or str(ROOT / "data" / "mitre_redteam_prompts.md")
+DEFAULT_OUT = ROOT / "data" / "mitre_prompts.jsonl"
 
 TECH_RE = re.compile(r"^### (T\d{4}(?:\.\d{3})?) - (.+?)\s*$")
 

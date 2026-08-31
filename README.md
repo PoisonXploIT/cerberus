@@ -128,7 +128,8 @@ El nombre del modelo que aparece en los entregables se toma de la variable de
 entorno `LOCAL_MODEL_NAME` (fallback: «modelo local evaluado»); el código genérico
 nunca lleva el nombre real.
 
-UI: dashboard offline sobre el último `data/results_*.jsonl` (por mtime; cards,
+UI: dashboard offline sobre el results canónico de `data/` (prioridad: nombre con
+"canonical", desempate por mtime; cards,
 buckets, gráfico SVG por táctica, tabla filtrable con vista detalle y sanitizador ON
 por defecto) + runner online (SSE, cancelar/reanudar desde checkpoint, SQLite en
 `runs/runs.sqlite3`). Sin datos: el dashboard muestra estado `no_data` hasta que

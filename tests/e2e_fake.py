@@ -20,7 +20,8 @@ import zipfile
 from pathlib import Path
 
 BASE = "http://127.0.0.1:8599"
-RUNS = Path(r"C:\Users\Sammi\CERBERUS\runs")
+ROOT = Path(__file__).resolve().parent.parent
+RUNS = ROOT / "runs"
 
 
 def req(method: str, path: str, body=None):

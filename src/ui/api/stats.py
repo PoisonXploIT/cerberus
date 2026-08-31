@@ -1,8 +1,9 @@
 """CERBERUS UI — datos del ultimo results_*.jsonl o de un run concreto (Fase 5a).
 
 Sin canónico hardcodeado: el dashboard se resuelve contra CERBERUS_HOME
-(por defecto la raiz del proyecto) y sirve el ultimo results_*.jsonl de
-data/ por mtime; si no hay ninguno, /api/stats devuelve {"status": "no_data"}.
+(por defecto la raiz del proyecto) y sirve el results canónico de data/
+(prioridad: nombre con "canonical"; desempate por mtime); si no hay
+ninguno, /api/stats devuelve {"status": "no_data"}.
 Opcional ?run=<run_id> para poblar el panel con el results.jsonl de un run.
 SQLite no interviene en estos endpoints; solo archivos JSONL.
 
@@ -38,14 +39,21 @@ router = APIRouter()
 
 
 def canonical_source() -> Path | None:
-    """Ultimo results_*.jsonl de data/ por mtime; None si no hay ninguno."""
+    """Fichero canónico del dashboard.
+
+    Prioridad: el results_*.jsonl cuyo nombre contenga "canonical" (el más
+    reciente si hay varios); si no existe ninguno, el results_*.jsonl más
+    reciente por mtime. None si no hay candidatos.
+    """
     d = data_dir()
     if not d.is_dir():
         return None
     cands = [p for p in d.glob("results_*.jsonl") if p.is_file()]
     if not cands:
         return None
-    return max(cands, key=lambda p: p.stat().st_mtime)
+    canonical = [p for p in cands if "canonical" in p.name.lower()]
+    pool = canonical or cands
+    return max(pool, key=lambda p: p.stat().st_mtime)
 
 
 def resolve_source(run: str) -> Path:

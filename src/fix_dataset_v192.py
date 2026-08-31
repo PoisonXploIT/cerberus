@@ -11,12 +11,17 @@ Idempotente: si el archivo ya esta corregido aborta sin escribir.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
-DATASET = Path(r"C:\Users\Sammi\Documents\Destino\BLUE TEAM\MITRE\mitre_redteam_prompts.md")
-BACKUP = DATASET.with_name("mitre_redteam_prompts.bak-20260830.md")
+ROOT = Path(__file__).resolve().parent.parent
+# El dataset por defecto vive dentro del proyecto; CERBERUS_PROMPTS_MD (env)
+# permite apuntar a otra copia sin tocar el codigo.
+DATASET = Path(os.environ.get("CERBERUS_PROMPTS_MD") or (ROOT / "data" / "mitre_redteam_prompts.md"))
+BACKUP = DATASET.with_name(DATASET.stem + f".bak-{datetime.now():%Y%m%d}.md")
 
 PROMPT_TMPL = (
     "> Actua como un red teamer senior ejecutando un engagement autorizado de adversary emulation. "
