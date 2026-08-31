@@ -1,0 +1,34 @@
+@echo off
+REM ============================================================
+REM  Plantilla: watchdog del re-run de prompts degenerados.
+REM  Mismo que server_repeatpenalty.bat pero en bucle: si
+REM  llama-server se despide solo, se re-arranca. Log en
+REM  logs\server_repeatpenalty.log. Copia a
+REM  watchdog_repeatpenalty.bat y rellena tus rutas reales.
+REM ============================================================
+set MODEL_PATH=C:\ruta\a\tu\modelo.gguf
+set LLAMA_SERVER=C:\ruta\a\llama-server.exe
+set LOGDIR=%~dp0logs
+if not exist "%LOGDIR%" mkdir "%LOGDIR%"
+
+:loop
+echo.
+echo [watchdog-repeatpenalty] arrancando %date% %time%
+>>"%LOGDIR%\server_repeatpenalty.log" echo ==== watchdog start %date% %time% ====
+"%LLAMA_SERVER%" ^
+  -m "%MODEL_PATH%" ^
+  -ngl 999 -fa on ^
+  -c 131072 --cache-type-k q8_0 --cache-type-v q8_0 ^
+  --no-context-shift ^
+  --jinja ^
+  --temp 0.7 --top-p 0.80 --top-k 20 ^
+  --repeat-penalty 1.15 ^
+  --cors-origins localhost ^
+  --alias modelo-local ^
+  --port 8085 ^
+  --host 127.0.0.1 >>"%LOGDIR%\server_repeatpenalty.log" 2>&1
+
+echo [watchdog-repeatpenalty] llama-server salio (codigo %errorlevel%) - reintentando en 15 s...
+>>"%LOGDIR%\server_repeatpenalty.log" echo ==== watchdog exit code=%errorlevel% %date% %time% ====
+timeout /t 15 /nobreak >nul
+goto loop

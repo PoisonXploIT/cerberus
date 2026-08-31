@@ -1,0 +1,31 @@
+@echo off
+REM ============================================================
+REM  Plantilla: servidor llama.cpp para el RE-RUN de prompts
+REM  degenerados (colapso repetitivo).
+REM  Copia este fichero a server_repeatpenalty.bat y rellena tus
+REM  rutas reales. Unica diferencia vs el servidor normal:
+REM  --repeat-penalty 1.15
+REM ============================================================
+set MODEL_PATH=C:\ruta\a\tu\modelo.gguf
+set LLAMA_SERVER=C:\ruta\a\llama-server.exe
+
+echo.
+echo  Servidor local - MODO RE-RUN (--repeat-penalty 1.15)
+echo.
+
+"%LLAMA_SERVER%" ^
+  -m "%MODEL_PATH%" ^
+  -ngl 999 -fa on ^
+  -c 131072 --cache-type-k q8_0 --cache-type-v q8_0 ^
+  --no-context-shift ^
+  --jinja ^
+  --temp 0.7 --top-p 0.80 --top-k 20 ^
+  --repeat-penalty 1.15 ^
+  --cors-origins localhost ^
+  --alias modelo-local ^
+  --port 8085 ^
+  --host 127.0.0.1
+
+echo.
+echo  Servidor detenido.
+pause

@@ -1,0 +1,47 @@
+# Entorno
+.venv/
+.env
+.env.*
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Datos y resultados (los genera el pipeline; nunca entran al repo)
+# NOTA: con "data/" (directorio completo) la negacion !data/.gitkeep no funcionaria,
+# por eso se ignora el contenido ("data/*") y no el directorio.
+data/*
+!data/.gitkeep
+runs/*
+!runs/.gitkeep
+reports/*
+!reports/.gitkeep
+logs/*
+!logs/.gitkeep
+
+# Configuracion local (keys SOLO por env; los settings reales nunca entran)
+config/settings.yaml
+config/*.local.yaml
+
+# Scripts locales con rutas/modelos reales (las plantillas .example si entran)
+server_*.bat
+!server_*.bat.example
+run_*.bat
+!run_*.bat.example
+rerun_*.bat
+watchdog_*.bat
+!watchdog_*.bat.example
+ui_serve.bat
+restart_ui.ps1
+
+# Modelos
+*.gguf
+*.bin
+*.safetensors
+
+# Diarios de sesion
+SEGUIMIENTO.md

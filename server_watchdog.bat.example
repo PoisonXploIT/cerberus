@@ -1,0 +1,32 @@
+@echo off
+REM ============================================================
+REM  Plantilla: watchdog del servidor llama.cpp (batch nocturno).
+REM  Si llama-server muere, se re-arranca solo y deja log en
+REM  CERBERUS\logs\server.log. Copia a server_watchdog.bat y
+REM  rellena tus rutas reales.
+REM ============================================================
+set MODEL_PATH=C:\ruta\a\tu\modelo.gguf
+set LLAMA_SERVER=C:\ruta\a\llama-server.exe
+set LOGDIR=%~dp0logs
+if not exist "%LOGDIR%" mkdir "%LOGDIR%"
+
+:loop
+echo.
+echo [watchdog] arrancando llama-server %date% %time%
+>>"%LOGDIR%\server.log" echo ==== watchdog start %date% %time% ====
+"%LLAMA_SERVER%" ^
+  -m "%MODEL_PATH%" ^
+  -ngl 999 -fa on ^
+  -c 131072 --cache-type-k q8_0 --cache-type-v q8_0 ^
+  --no-context-shift ^
+  --jinja ^
+  --temp 0.7 --top-p 0.80 --top-k 20 ^
+  --cors-origins localhost ^
+  --alias modelo-local ^
+  --port 8085 ^
+  --host 127.0.0.1 >>"%LOGDIR%\server.log" 2>&1
+
+echo [watchdog] llama-server salio (codigo %errorlevel%) - reintentando en 15 s...
+>>"%LOGDIR%\server.log" echo ==== watchdog exit code=%errorlevel% %date% %time% ====
+timeout /t 15 /nobreak >nul
+goto loop
