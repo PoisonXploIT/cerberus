@@ -177,3 +177,10 @@ contenga nombres reales de modelo ni keys hardcodeadas.
 3. **Exportar UI a PDF**: «descargar informe» desde el dashboard.
 
 Plan de trabajo: `PLAN.md`.
+
+---
+
+## Contacto
+
+- Pagina: [sammideblas.com](https://sammideblas.com)
+- Email: analista@sammideblas.com
