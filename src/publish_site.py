@@ -403,8 +403,8 @@ def deploy(site_repo: Path, cfg: dict, token: str, account: str) -> tuple[bool, 
 
 
 def publish(run_id: str | None, cfg: dict, token: str, account: str,
-            message: str | None = None) -> dict:
-    payload = build_payload(run_id, cfg["label"])
+            message: str | None = None, label: str | None = None) -> dict:
+    payload = build_payload(run_id, (label or cfg["label"]).strip()[:60])
     issues = audit(payload)
     if issues:
         raise PublishError("auditoria fallida:\n  - " + "\n  - ".join(issues[:10]))
@@ -424,6 +424,8 @@ def main() -> int:
     ap.add_argument("--setup", action="store_true",
                     help="crea proyecto, dominio, DNS y Access si faltan")
     ap.add_argument("--site", default=None, help="ruta del repo del sitio")
+    ap.add_argument("--label", default=None,
+                    help="etiqueta del modelo auditado (por defecto la de config)")
     args = ap.parse_args()
 
     cfg = load_config()
@@ -431,7 +433,8 @@ def main() -> int:
         cfg["site_repo"] = args.site
     try:
         cfg = validate_config(cfg)
-        payload = build_payload(args.run, cfg["label"])
+        label = (args.label or cfg["label"]).strip()[:60]
+        payload = build_payload(args.run, label)
         issues = audit(payload)
         print(f"run: {payload['run_id']} | prompts: {payload['total']} | "
               f"tecnicas: {len(payload['techniques'])} | "
@@ -462,7 +465,7 @@ def main() -> int:
                 return 0
         if not token or not account:
             raise PublishError("faltan CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID")
-        res = publish(args.run, cfg, token, account)
+        res = publish(args.run, cfg, token, account, label=label)
         print("commit:", res["commit"] or "(sin cambios)")
         print("deploy:", "OK" if res["deploy_ok"] else "FALLIDO")
         print(res["deploy_log"])

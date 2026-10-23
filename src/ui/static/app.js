@@ -1049,6 +1049,7 @@ function renderPubSummary(d) {
   host.hidden = false;
   const items = [
     ["Run", d.run || "—", ""],
+    ["Modelo", d.label || "—", ""],
     ["Prompts", fmtInt(d.total), ""],
     ["Tecnicas", fmtInt(d.techniques), ""],
     ["data.json", (d.size / 1024).toFixed(1) + " KB", ""],
@@ -1086,7 +1087,12 @@ async function publishRequest(dryRun) {
     const d = await api("/api/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ run_id: runId, dry_run: dryRun, confirm: !dryRun }),
+      body: JSON.stringify({
+        run_id: runId,
+        label: ($("pub-label").value || "").trim() || null,
+        dry_run: dryRun,
+        confirm: !dryRun,
+      }),
     });
     renderPubSummary(d);
     if (dryRun) {

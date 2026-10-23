@@ -382,8 +382,21 @@ def delete_run_endpoint(run_id: str) -> dict:
 
 class PublishRequest(BaseModel):
     run_id: str | None = None
+    label: str | None = Field(default=None, max_length=60)
     dry_run: bool = False
     confirm: bool = False
+
+    @field_validator("label")
+    @classmethod
+    def _check_label(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        clean = " ".join(v.split())
+        if not clean:
+            return None
+        if any(c in clean for c in "\\/:*?<>|"):
+            raise ValueError("la etiqueta no admite rutas ni caracteres de control")
+        return clean[:60]
 
     @field_validator("run_id")
     @classmethod
@@ -409,13 +422,15 @@ def publish_public(body: PublishRequest) -> dict:
         except publish_site.PublishError as e:
             raise HTTPException(status_code=409,
                                 detail=f"publicador no configurado: {e}") from e
+        label = (body.label or cfg["label"]).strip()[:60]
         try:
-            payload = publish_site.build_payload(body.run_id, cfg["label"])
+            payload = publish_site.build_payload(body.run_id, label)
         except (publish_site.PublishError, InvalidRunId) as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
         issues = publish_site.audit(payload)
         summary = {
             "run": payload["run_id"],
+            "label": payload["label"],
             "total": payload["total"],
             "techniques": len(payload["techniques"]),
             "size": len(json.dumps(payload, ensure_ascii=False).encode("utf-8")),
@@ -434,7 +449,7 @@ def publish_public(body: PublishRequest) -> dict:
         if not token or not account:
             raise HTTPException(status_code=409, detail="sin credenciales de Cloudflare")
         try:
-            res = publish_site.publish(body.run_id, cfg, token, account)
+            res = publish_site.publish(body.run_id, cfg, token, account, label=label)
         except publish_site.PublishError as e:
             raise HTTPException(status_code=502, detail=str(e)) from e
         log.info("publicado %s en %s", res["payload"]["run_id"], cfg["domain"])
