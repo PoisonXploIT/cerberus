@@ -77,6 +77,13 @@ def main() -> int:
     check("reports/info", call("/api/reports/info")[0], 200)
     check("events sin token", call(f"/events/run/{RID}", token=False)[0], 401)
     check("history", call("/api/history")[0], 200)
+    check("publish sin token", call("/api/publish", "POST", {"dry_run": True}, token=False)[0], 401)
+    check("publish run invalido",
+          call("/api/publish", "POST", {"run_id": "../x", "dry_run": True})[0], 422)
+    check("publish sin confirmar",
+          call("/api/publish", "POST", {"dry_run": False})[0], (428, 409, 422))
+    check("publish dry-run",
+          call("/api/publish", "POST", {"dry_run": True})[0], (200, 409))
     check("borrar run inexistente", call("/api/run/no_existe_123", "DELETE")[0], 404)
     check("borrar run_id invalido", call("/api/run/..%2Fescape", "DELETE")[0], (400, 404, 405))
 

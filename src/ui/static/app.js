@@ -93,12 +93,32 @@ async function api(path, opts = {}) {
 }
 
 function confirmAction(title, text) {
+  // No se usa el evento `close` del <dialog>: en algunas versiones de Chrome no
+  // se dispara al cerrar por codigo. Se resuelve con los botones y Escape.
   return new Promise((resolve) => {
     const dlg = $("confirm");
     $("confirm-title").textContent = title;
     $("confirm-text").textContent = text;
-    dlg.returnValue = "";
-    dlg.addEventListener("close", () => resolve(dlg.returnValue === "ok"), { once: true });
+    const buttons = [...dlg.querySelectorAll("button[value]")];
+
+    const finish = (value) => {
+      buttons.forEach((b) => b.removeEventListener("click", b._onClick));
+      dlg.removeEventListener("cancel", onCancel);
+      dlg.close();
+      resolve(value === "ok");
+    };
+    const onCancel = (ev) => {
+      ev.preventDefault();
+      finish("cancel");
+    };
+    buttons.forEach((b) => {
+      b._onClick = (ev) => {
+        ev.preventDefault();
+        finish(b.value);
+      };
+      b.addEventListener("click", b._onClick);
+    });
+    dlg.addEventListener("cancel", onCancel);
     dlg.showModal();
   });
 }
@@ -750,6 +770,15 @@ async function refreshRuns() {
   }
   sel.value = current;
 
+  const pubSel = $("pub-run");
+  if (pubSel) {
+    const cur = pubSel.value;
+    pubSel.textContent = "";
+    pubSel.appendChild(new Option("canonico", ""));
+    for (const r of rows) pubSel.appendChild(new Option(r.run_id, r.run_id));
+    pubSel.value = cur;
+  }
+
   for (const id of ["cmp-a", "cmp-b"]) {
     const old = $(id).value;
     $(id).textContent = "";
@@ -1012,6 +1041,78 @@ function initHistory() {
   });
 }
 
+/* ----------------------------------------------------------------- publicar */
+
+function renderPubSummary(d) {
+  const host = $("pub-summary");
+  host.textContent = "";
+  host.hidden = false;
+  const items = [
+    ["Run", d.run || "—", ""],
+    ["Prompts", fmtInt(d.total), ""],
+    ["Tecnicas", fmtInt(d.techniques), ""],
+    ["data.json", (d.size / 1024).toFixed(1) + " KB", ""],
+    ["Campos no publicados", fmtInt(d.dropped_fields), ""],
+    ["Dominio", d.domain || "—", ""],
+    ["Auditoria", d.audit_ok ? "OK" : "FALLIDA", d.audit_ok ? "ok" : "bad"],
+  ];
+  for (const [k, v, cls] of items) {
+    const box = el("div", undefined, "item " + cls);
+    box.appendChild(el("div", k, "k"));
+    box.appendChild(el("div", v, "v"));
+    host.appendChild(box);
+  }
+  if (!d.audit_ok && d.issues?.length) {
+    const box = el("div", undefined, "item bad");
+    box.appendChild(el("div", "Problemas", "k"));
+    box.appendChild(el("div", d.issues.join(" · "), "v"));
+    host.appendChild(box);
+  }
+}
+
+async function publishRequest(dryRun) {
+  const runId = $("pub-run").value || null;
+  if (!dryRun) {
+    const ok = await confirmAction(
+      "Publicar agregados",
+      "Se actualiza el sitio privado con los agregados de este run. No se publican prompts, respuestas ni IOCs."
+    );
+    if (!ok) return;
+  }
+  $("btn-pub").disabled = true;
+  $("btn-pub-preview").disabled = true;
+  $("pub-status").textContent = dryRun ? "comprobando…" : "publicando…";
+  try {
+    const d = await api("/api/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: runId, dry_run: dryRun, confirm: !dryRun }),
+    });
+    renderPubSummary(d);
+    if (dryRun) {
+      $("pub-status").textContent = d.audit_ok ? "listo para publicar" : "auditoria fallida";
+      toast(d.audit_ok ? "Previsualizacion correcta." : "La auditoria detecto problemas.", d.audit_ok ? "ok" : "bad");
+      return;
+    }
+    const log = $("pub-log");
+    log.hidden = false;
+    log.textContent = (d.commit ? "commit: " + d.commit + "\n" : "") + (d.log || "");
+    $("pub-status").textContent = d.deploy_ok ? "publicado" : "deploy fallido";
+    toast(d.deploy_ok ? "Sitio actualizado." : "Commit hecho, deploy fallido.", d.deploy_ok ? "ok" : "bad", 7000);
+  } catch (e) {
+    $("pub-status").textContent = "error";
+    toast("No se pudo publicar: " + e.message, "bad", 8000);
+  } finally {
+    $("btn-pub").disabled = false;
+    $("btn-pub-preview").disabled = false;
+  }
+}
+
+function initPublish() {
+  $("btn-pub-preview").addEventListener("click", () => publishRequest(true));
+  $("btn-pub").addEventListener("click", () => publishRequest(false));
+}
+
 /* -------------------------------------------------------------------- init */
 
 function fillTacticOptions(tactics) {
@@ -1059,6 +1160,7 @@ async function boot() {
   initRunner();
   initCompare();
   initHistory();
+  initPublish();
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape" && !$("drawer").hidden) closeDrawer();
   });

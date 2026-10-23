@@ -45,3 +45,6 @@ restart_ui.ps1
 
 # Diarios de sesion
 SEGUIMIENTO.md
+
+# Configuracion local del publicador (rutas de este equipo)
+config/publish.json

@@ -40,6 +40,7 @@
       <a href="#results">Resultados</a>
       <a href="#runner">Runner</a>
       <a href="#history">Historial</a>
+      <a href="#publish">Publicar</a>
       <a href="#compare">Comparar</a>
       <a href="#reports">Informes</a>
       <a href="#help">Ayuda</a>
@@ -211,6 +212,31 @@
             </thead>
             <tbody id="history-body"></tbody>
           </table>
+        </div>
+      </section>
+
+      <section id="publish-section" aria-labelledby="h-publish">
+        <div class="sec-head">
+          <h2 id="h-publish">Publicar</h2>
+          <span class="chip" id="pub-status">sin publicar</span>
+        </div>
+        <div class="panel">
+          <p class="muted">
+            Publica solo agregados (KPIs, tacticas y una fila por tecnica) en el sitio
+            privado. No salen prompts, respuestas, rutas ni IOCs. El repo del sitio y el
+            dominio se validan en local antes de escribir.
+          </p>
+          <div class="grid-form">
+            <label>Run
+              <select id="pub-run"><option value="">canonico</option></select>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="btn-pub-preview" class="btn" type="button">Previsualizar</button>
+            <button id="btn-pub" class="btn primary" type="button">Publicar</button>
+          </div>
+          <div id="pub-summary" class="summary" hidden></div>
+          <pre id="pub-log" class="console" hidden></pre>
         </div>
       </section>
 

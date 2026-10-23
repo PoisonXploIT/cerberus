@@ -487,6 +487,25 @@ td.actions { display: flex; gap: 6px; flex-wrap: wrap; white-space: nowrap; }
 .badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
 .badge.live { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
 
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.summary .item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+}
+.summary .item .k {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint);
+}
+.summary .item .v { font-family: var(--mono); font-size: 14px; margin-top: 3px; }
+.summary .item.bad { border-left: 3px solid var(--bad); }
+.summary .item.ok { border-left: 3px solid var(--ok); }
+
 .pager {
   display: flex;
   align-items: center;

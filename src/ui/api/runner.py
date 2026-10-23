@@ -44,6 +44,7 @@ from run_mitre_eval import (  # noqa: E402
 
 from db import create_run, delete_run, get_run, list_runs, set_status  # noqa: E402
 from home import runs_dir  # noqa: E402
+import publish_site  # noqa: E402
 from logging_setup import get_logger  # noqa: E402
 from paths import InvalidRunId, run_dir as safe_run_dir, validate_run_id  # noqa: E402
 from urls import BadUrl, validate_judge_base_url, validate_local_base_url  # noqa: E402
@@ -377,6 +378,71 @@ def delete_run_endpoint(run_id: str) -> dict:
     log.warning("run %s borrado del disco y del historial", run_id)
     _HIST_CACHE.pop(run_id, None)
     return {"ok": True, "deleted": run_id}
+
+
+class PublishRequest(BaseModel):
+    run_id: str | None = None
+    dry_run: bool = False
+    confirm: bool = False
+
+    @field_validator("run_id")
+    @classmethod
+    def _check_run(cls, v: str | None) -> str | None:
+        return None if not v else validate_run_id(v)
+
+
+_PUBLISH_LOCK = threading.Lock()
+
+
+@router.post("/api/publish")
+def publish_public(body: PublishRequest) -> dict:
+    """Publica los agregados del run en el sitio estatico (repo privado + Pages).
+
+    No acepta URLs: repo, proyecto y dominio salen de config/publish.json y se
+    validan contra reglas fijas. El payload se audita antes de escribirse.
+    """
+    if not _PUBLISH_LOCK.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="ya hay una publicacion en curso")
+    try:
+        try:
+            cfg = publish_site.validate_config(publish_site.load_config())
+        except publish_site.PublishError as e:
+            raise HTTPException(status_code=409,
+                                detail=f"publicador no configurado: {e}") from e
+        try:
+            payload = publish_site.build_payload(body.run_id, cfg["label"])
+        except (publish_site.PublishError, InvalidRunId) as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+        issues = publish_site.audit(payload)
+        summary = {
+            "run": payload["run_id"],
+            "total": payload["total"],
+            "techniques": len(payload["techniques"]),
+            "size": len(json.dumps(payload, ensure_ascii=False).encode("utf-8")),
+            "dropped_fields": payload["dropped_fields"],
+            "audit_ok": not issues,
+            "issues": issues[:10],
+            "domain": cfg["domain"],
+        }
+        if issues:
+            return {"ok": False, "dry_run": True, **summary}
+        if body.dry_run:
+            return {"ok": True, "dry_run": True, **summary}
+        if not body.confirm:
+            raise HTTPException(status_code=428, detail="falta confirmacion explicita")
+        token, account = publish_site.credentials()
+        if not token or not account:
+            raise HTTPException(status_code=409, detail="sin credenciales de Cloudflare")
+        try:
+            res = publish_site.publish(body.run_id, cfg, token, account)
+        except publish_site.PublishError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+        log.info("publicado %s en %s", res["payload"]["run_id"], cfg["domain"])
+        return {"ok": res["deploy_ok"], "dry_run": False, **summary,
+                "commit": res["commit"], "deploy_ok": res["deploy_ok"],
+                "log": res["deploy_log"]}
+    finally:
+        _PUBLISH_LOCK.release()
 
 
 @router.get("/api/local/status")

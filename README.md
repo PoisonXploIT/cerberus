@@ -159,6 +159,32 @@ Endpoints de la UI: `/api/stats`, `/api/results[/{i}]`, `/api/runs`, `/api/histo
 `/api/local/status`, `/api/config/judge`, `/api/reports[/info|/all|/{key}]` y
 `/events/run/{id}` (SSE).
 
+## Sitio publico de resultados (opcional)
+
+`src/publish_site.py` publica **solo agregados** de un run en un repo privado
+(`cerberus-site`) y despliega en Cloudflare Pages bajo `cerberus.sammideblas.com`,
+protegido con Cloudflare Access.
+
+```bat
+copy config\publish.example.json config\publish.json   :: ajusta site_repo
+.venv\Scripts\python.exe src\publish_site.py --dry-run
+.venv\Scripts\python.exe src\publish_site.py --yes
+.venv\Scripts\python.exe src\publish_site.py --setup  :: Pages + dominio + DNS + Access
+```
+
+- El payload se **audita** antes de escribir: sin prompts, respuestas, rutas, IPs,
+  URLs, tokens ni cadenas largas. Si la auditoria falla, no se escribe nada.
+- No acepta URLs: repo, proyecto y dominio vienen de `config/publish.json` o del
+  entorno, y se validan (proyecto `^[a-z0-9-]+$`; dominio subdominio de
+  `sammideblas.com`).
+- El token de Cloudflare se lee del entorno o del registro de Windows y se pasa a
+  wrangler; nunca se escribe en el repo.
+- Mismo flujo desde la UI local: seccion **Publicar** con previsualizacion y boton,
+  endpoint `POST /api/publish` (token de sesion, `confirm` obligatorio, un solo job).
+
+El sitio (`cerberus-site`) es estatico: HTML, CSS y JS propios, `data.json` con los
+agregados y `_headers` con CSP estricta, `noindex` y sin framing.
+
 ## Seguridad
 
 - Keys solo por variables de entorno; nunca en código ni logs.
