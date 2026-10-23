@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from fastapi import APIRouter, HTTPException  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from pydantic import BaseModel, Field, field_validator  # noqa: E402
 
 from clients import OpenAICompatClient, ServerDown, build_clients  # noqa: E402
 from config import load_settings  # noqa: E402
@@ -42,7 +42,8 @@ from run_mitre_eval import (  # noqa: E402
 )
 
 from db import create_run, get_run, list_runs, set_status  # noqa: E402
-from home import runs_dir  # noqa: E402
+from paths import InvalidRunId, run_dir as safe_run_dir, validate_run_id  # noqa: E402
+from urls import BadUrl, validate_judge_base_url, validate_local_base_url  # noqa: E402
 
 router = APIRouter()
 
@@ -57,6 +58,7 @@ class _Run:
 
 ACTIVE: dict[str, _Run] = {}
 _LOCK = threading.Lock()
+MAX_ACTIVE = 2  # un run y un juez a la vez; mas seria competir por la GPU
 
 
 # ---------------------------------------------------------------- worker -----
@@ -131,19 +133,34 @@ def _sse_stream(run_id: str):
 # ------------------------------------------------------------- endpoints ----
 
 class RunRequest(BaseModel):
-    tactic: str | None = None
-    technique: str | None = None
-    limit: int = 0
-    max_tokens: int = 4096
-    repeat_penalty: float | None = 1.15  # leccion del canonico: evita colapsos
-    temperature: float = 0.2
+    tactic: str | None = Field(default=None, max_length=80)
+    technique: str | None = Field(default=None, max_length=32)
+    limit: int = Field(default=0, ge=0, le=1000)
+    max_tokens: int = Field(default=4096, ge=1, le=16384)
+    repeat_penalty: float | None = Field(default=1.15, ge=1.0, le=2.0)
+    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     run_id: str | None = None
-    local_base_url: str | None = None  # p.ej http://localhost:8085/v1 (default: env LOCAL_BASE_URL)
+    local_base_url: str | None = None  # solo loopback; se valida abajo
+
+    @field_validator("run_id")
+    @classmethod
+    def _check_run_id(cls, v: str | None) -> str | None:
+        return None if not v else validate_run_id(v)
+
+    @field_validator("local_base_url")
+    @classmethod
+    def _check_local_url(cls, v: str | None) -> str | None:
+        return None if not v else validate_local_base_url(v)
 
 
 class JudgeRequest(BaseModel):
-    base_url: str | None = None  # default: env JUDGE_BASE_URL
-    model: str | None = None     # default: env JUDGE_MODEL; la key SIEMPRE por env
+    base_url: str | None = None  # default: env JUDGE_BASE_URL; debe pasar la allowlist
+    model: str | None = Field(default=None, max_length=120)
+
+    @field_validator("base_url")
+    @classmethod
+    def _check_judge_url(cls, v: str | None) -> str | None:
+        return None if not v else validate_judge_base_url(v)
 
 
 @router.post("/api/run")
@@ -153,8 +170,10 @@ def start_run(body: RunRequest) -> dict:
 
     # Ping a la URL configurada ANTES de lanzar (mismo criterio que el CLI).
     s = load_settings()
-    if body.local_base_url:
-        s.local_base_url = body.local_base_url.strip()
+    try:
+        s.local_base_url = validate_local_base_url(body.local_base_url or s.local_base_url)
+    except BadUrl as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     local, _judge = build_clients(s)
     try:
         models = local.ping()
@@ -175,6 +194,9 @@ def start_run(body: RunRequest) -> dict:
     )
     r = _Run(cfg)
     with _LOCK:
+        if len(ACTIVE) >= MAX_ACTIVE:
+            raise HTTPException(status_code=429,
+                                detail=f"ya hay {len(ACTIVE)} jobs en curso; espera o cancela uno")
         if run_id in ACTIVE:
             raise HTTPException(status_code=409, detail=f"{run_id} ya esta en curso")
         if get_run(run_id) is not None:
@@ -224,8 +246,10 @@ def resume_run(run_id: str) -> dict:
 
     c = row["config"] or {}
     s = load_settings()
-    if c.get("local_base_url"):
-        s.local_base_url = c["local_base_url"]
+    try:
+        s.local_base_url = validate_local_base_url(c.get("local_base_url") or s.local_base_url)
+    except BadUrl as e:
+        raise HTTPException(status_code=422, detail=f"URL guardada no valida: {e}") from e
     local, _judge = build_clients(s)
     try:
         local.ping()
@@ -262,6 +286,21 @@ def runs(limit: int = 50) -> list[dict]:
     return out
 
 
+@router.get("/api/local/status")
+def local_status(base_url: str | None = None) -> dict:
+    """Ping corto al servidor local para que el panel muestre si esta vivo."""
+    s = load_settings()
+    try:
+        base = validate_local_base_url(base_url or s.local_base_url)
+    except BadUrl as e:
+        return {"ok": False, "base_url": s.local_base_url, "models": [], "error": str(e)}
+    client = OpenAICompatClient(base, s.local_model, timeout_s=3)
+    try:
+        return {"ok": True, "base_url": base, "models": client.ping(), "error": None}
+    except ServerDown as e:
+        return {"ok": False, "base_url": base, "models": [], "error": str(e)[:200]}
+
+
 # ---------------------------------------------------------------- juez -------
 # El juez cloud puntua los casos ambiguos (harm 0.3-0.7) de un run pasivo ya
 # terminado. La API key NUNCA viaja por la UI: solo JUDGE_API_KEY en el env del
@@ -283,7 +322,8 @@ def judge_config_status() -> dict:
 
 
 def _run_dir(run_id: str) -> Path:
-    return runs_dir() / run_id
+    """Directorio del run; rechaza cualquier id que salga de runs/."""
+    return safe_run_dir(run_id)
 
 
 def _write_merged(run_id: str) -> dict:
@@ -446,11 +486,19 @@ def _judge_worker(run_id: str) -> None:
 @router.post("/api/run/{run_id}/judge")
 def judge_run(run_id: str, body: JudgeRequest) -> dict:
     # Valido contra disco (no solo BD): los runs hechos por CLI tambien se pueden juzgar.
-    if not (_run_dir(run_id) / "results.jsonl").exists():
+    try:
+        run_path = _run_dir(run_id)
+    except InvalidRunId as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not (run_path / "results.jsonl").exists():
         raise HTTPException(status_code=404, detail=f"run desconocido o sin results.jsonl: {run_id}")
     s = load_settings()
-    model = (body.model or "").strip() or s.judge_model
+    model = (body.model or "").strip() or (s.judge_model or "")
     base_url = (body.base_url or "").strip() or s.judge_base_url
+    try:
+        base_url = validate_judge_base_url(base_url)
+    except BadUrl as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     if not s.judge_api_key:
         raise HTTPException(
             status_code=409,

@@ -16,6 +16,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException  # noqa: E402
 
 from home import runs_dir  # noqa: E402
+from paths import InvalidRunId, run_dir as safe_run_dir  # noqa: E402
 
 RUNS_DIR = runs_dir()
 
@@ -62,7 +63,10 @@ def _dist(vals: list[float]) -> dict:
 
 
 def _run_stats(run_id: str) -> dict:
-    run_dir = RUNS_DIR / run_id
+    try:
+        run_dir = safe_run_dir(run_id)
+    except InvalidRunId as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     results = run_dir / "results.jsonl"
     if not results.is_file():
         raise HTTPException(status_code=404, detail=f"{run_id}: sin results.jsonl")
@@ -131,7 +135,7 @@ def compare_runs(a: str, b: str) -> dict:
     # Diff técnica a técnica: la union de tecnicas de ambos runs, ordenada por |diff|.
     def tech_map(run_id: str) -> dict[tuple, float]:
         out: dict[tuple, float] = {}
-        with (RUNS_DIR / run_id / "results.jsonl").open(encoding="utf-8") as f:
+        with (safe_run_dir(run_id) / "results.jsonl").open(encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     r = json.loads(line)

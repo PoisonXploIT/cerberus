@@ -131,6 +131,7 @@ Sin key: abort limpio exit 2 (el merge sin juez documenta harm_final = heurísti
 ### Informes, exports y UI
 
 ```bat
+.venv\Scripts\python.exe -m pip install -r requirements.txt      :: dependencias pinneadas
 .venv\Scripts\python.exe src\generate_report.py --source merged   :: informe técnico + CSV tácticas
 .venv\Scripts\python.exe src\export_deliverables.py              :: informe legible MD/PDF + JSON + CSV técnicas
 ui_serve.bat                                                      :: http://127.0.0.1:8599
@@ -141,29 +142,55 @@ entorno `LOCAL_MODEL_NAME` (fallback: «modelo local evaluado»); el código gen
 nunca lleva el nombre real.
 
 UI: dashboard offline sobre el results canónico de `data/` (prioridad: nombre con
-"canonical", desempate por mtime; cards,
-buckets, gráfico SVG por táctica, tabla filtrable con vista detalle y sanitizador ON
-por defecto) + runner online (SSE, cancelar/reanudar desde checkpoint, SQLite en
-`runs/runs.sqlite3`). Sin datos: el dashboard muestra estado `no_data` hasta que
-exista un results.
+"canonical", desempate por mtime) + runner online (SSE, cancelar/reanudar desde
+checkpoint, SQLite en `runs/runs.sqlite3`). Sin datos: el dashboard muestra estado
+`no_data` hasta que exista un results.
+
+La interfaz (`src/ui/static/`) es HTML + CSS + JS sin dependencias ni CDN:
+navegación lateral, panel de estado del servidor local, tabla ordenable y navegable
+por teclado, detalle en panel lateral con pestañas (prompt / respuesta / métricas),
+confirmación en acciones destructivas, informes con tamaño y fecha, y exportación
+CSV de la comparativa. Tema oscuro y claro; favicon e icono propios.
 
 ## Seguridad
 
 - Keys solo por variables de entorno; nunca en código ni logs.
-- Puerto del servidor configurable (por defecto 8085) solo localhost; UI bind
-  estricto a `127.0.0.1:8599` (sin auth: no exponer).
+- Puerto del servidor configurable (por defecto 8085) solo loopback; UI bind estricto
+  a `127.0.0.1:8599`.
+- **Token de sesión local**: la UI genera `runs/.ui_token` (0600) al arrancar y lo
+  entrega como cookie `HttpOnly; SameSite=Strict` al abrir `/`. Las rutas `/api/*` y
+  `/events/*` exigen ese token (cookie o cabecera `X-CERBERUS-Token`). Los scripts de
+  prueba lo leen del fichero.
+- **Anti-DNS-rebinding**: se rechaza cualquier `Host` que no sea loopback, y los
+  métodos que cambian estado con `Origin` externo.
+- **Allowlist de URLs**: el servidor local debe ser loopback; el juez solo `https`
+  contra `JUDGE_ALLOWED_HOSTS` (por defecto OpenRouter, DeepSeek, OpenAI, Anthropic,
+  DashScope). La API key nunca se manda a un host fuera de la lista.
+- **Validación de `run_id`** en todas las entradas: sin `..`, sin separadores; nada
+  escribe fuera de `runs/`.
+- **Límites**: `limit ≤ 1000`, `max_tokens ≤ 16384`, dos jobs concurrentes como máximo
+  (un run y un juez).
+- Cabeceras `Content-Security-Policy` (script-src estricto), `nosniff`,
+  `no-referrer`, `frame-ancestors none` y `Cache-Control: no-store` en `/api/*`.
 - Logs sin prompts completos por defecto (debug opt-in); llama.cpp con logs saneados.
 - Modelo local aislado: sin red de producción, sin sistemas reales, sin ejecución de
   payloads.
 
+Detalle del modelo de amenazas en `SECURITY.md`.
+
 ## Verificación pre-push
 
 ```bat
-.venv\Scripts\python scripts\sanity_check.py
+.venv\Scripts\python -m unittest discover -s tests -v
+.venv\Scripts\python tests\check_http_security.py   :: con la UI levantada
+.venv\Scripts\python scripts\sanity_check.py       :: debe devolver 0
 ```
 
-Debe devolver **0** antes de cada push: comprueba que ningún fichero del repo
-contenga nombres reales de modelo ni keys hardcodeadas.
+`unittest` cubre validación de `run_id`, allowlist de URLs y comprobaciones de `Host`.
+`check_http_security.py` verifica en vivo token, cabeceras, traversal y SSRF.
+`sanity_check.py` comprueba que no haya nombres reales de modelo ni keys en el árbol.
+CI (`.github/workflows/ci.yml`) ejecuta compilación, tests y `sanity_check` en cada
+push.
 
 ## Fase II — trabajo futuro (NO APROBADO; plan y aprobación propios)
 

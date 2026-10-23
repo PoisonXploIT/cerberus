@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from api.compare import router as compare_router  # noqa: E402
 from api.runner import router as runner_router  # noqa: E402
 from api.stats import router as stats_router  # noqa: E402
+import security  # noqa: E402
 from db import recover_orphans  # noqa: E402
 from home import reports_dir  # noqa: E402
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     if n:
         print(f"aviso: {n} run(s) huérfano(s) marcados como error; reanuda desde checkpoint.")
     app = FastAPI(title="CERBERUS UI", docs_url=None, openapi_url=None)
+    security.install(app)
     app.include_router(stats_router)
     app.include_router(runner_router)
     app.include_router(compare_router)
@@ -52,6 +54,17 @@ def create_app() -> FastAPI:
     @app.get("/api/reports")
     def list_reports():
         return {k: v.name for k, v in REPORTS.items() if v.exists()}
+
+    @app.get("/api/reports/info")
+    def reports_info():
+        """Lista con tamano y fecha para pintar tarjetas en el frontend."""
+        out = []
+        for key, path in REPORTS.items():
+            if path.exists():
+                st = path.stat()
+                out.append({"key": key, "name": path.name,
+                            "size": st.st_size, "mtime": st.st_mtime})
+        return out
 
     # Registro ANTES de /api/reports/{name}: FastAPI machaca por orden.
     @app.get("/api/reports/all")
@@ -89,6 +102,7 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    print("AVISO: la UI escucha SOLO en 127.0.0.1 y no tiene auth por diseno.")
+    print("La UI escucha SOLO en 127.0.0.1.")
+    print("Token de sesion en runs/.ui_token (o env CERBERUS_UI_TOKEN).")
     print("No expongas este puerto fuera de localhost.")
     uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("CERBERUS_UI_PORT", "8599")))

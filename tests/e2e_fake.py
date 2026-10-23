@@ -22,6 +22,8 @@ from pathlib import Path
 BASE = "http://127.0.0.1:8599"
 ROOT = Path(__file__).resolve().parent.parent
 RUNS = ROOT / "runs"
+TOKEN_FILE = RUNS / ".ui_token"
+TOKEN = TOKEN_FILE.read_text(encoding="utf-8").strip() if TOKEN_FILE.exists() else ""
 
 
 def req(method: str, path: str, body=None):
@@ -29,6 +31,8 @@ def req(method: str, path: str, body=None):
     r = urllib.request.Request(BASE + path, data=data, method=method)
     if data:
         r.add_header("Content-Type", "application/json")
+    if TOKEN:
+        r.add_header("X-CERBERUS-Token", TOKEN)
     try:
         with urllib.request.urlopen(r) as resp:
             return resp.status, json.loads(resp.read())
@@ -115,7 +119,10 @@ st2, cmp2 = req("GET", f"/api/runs/{ra}/compare/run_20260830_010330")
 check("compare contra run CLI (solo en disco)", st2 == 200 and cmp2["b"]["total"] > 0)
 
 # 5. ZIP de reportes
-with urllib.request.urlopen(BASE + "/api/reports/all") as resp:
+zip_req = urllib.request.Request(BASE + "/api/reports/all")
+if TOKEN:
+    zip_req.add_header("X-CERBERUS-Token", TOKEN)
+with urllib.request.urlopen(zip_req) as resp:
     z = zipfile.ZipFile(io.BytesIO(resp.read()))
 names = sorted(z.namelist())
 check("zip con los 5 reportes", names == sorted([

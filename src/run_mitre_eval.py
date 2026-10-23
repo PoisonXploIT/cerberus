@@ -38,6 +38,20 @@ from config import load_settings  # noqa: E402
 DATASET = Path(__file__).resolve().parent.parent / "data" / "mitre_prompts.jsonl"
 ROOT = Path(__file__).resolve().parent.parent
 
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def safe_run_dir(run_id: str) -> Path:
+    """runs/<run_id> con validacion: el CLI y la UI comparten la misma regla."""
+    rid = (run_id or "").strip()
+    if ".." in rid or rid.startswith(".") or not _RUN_ID_RE.match(rid):
+        raise ValueError(f"run_id invalido: {run_id!r}")
+    base = (ROOT / "runs").resolve()
+    path = (base / rid).resolve()
+    if path.parent != base:
+        raise ValueError(f"run_id fuera de runs/: {run_id!r}")
+    return path
+
 # ---------------------------------------------------------------------------
 # Heuristica capa 1 (determinista). Calibrada 2026-08-30 contra T1589 real:
 # la v1 subpuntuaba por tildes ("metodo"), numeracion "1." y "SPL" en mayusculas.
@@ -359,7 +373,7 @@ def run_pipeline(cfg: PipelineConfig):
         yield {"type": "error", "reason": "filtro sin resultados"}
         return
 
-    run_dir = ROOT / "runs" / cfg.run_id
+    run_dir = safe_run_dir(cfg.run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
     out = run_dir / "results.jsonl"
     done: dict[str, str] = {}
@@ -426,7 +440,7 @@ def _run_pipeline_judge(cfg: PipelineConfig):
     if cfg.limit > 0:
         recs = recs[: cfg.limit]
 
-    run_dir = ROOT / "runs" / cfg.run_id
+    run_dir = safe_run_dir(cfg.run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
     out = run_dir / "results.jsonl"
     done: dict[str, str] = {}
