@@ -81,13 +81,18 @@ plantillas `*.bat.example`, rellena `MODEL_PATH` / `LLAMA_SERVER` y usa el nombr
 
 ## Instalación
 
-Requisitos: Windows, Python 3.12, GPU compatible con CUDA con VRAM suficiente para
-offload completo, llama.cpp.
+Requisitos: Python 3.12 (Windows, macOS o Linux). Para evaluar un modelo hace falta
+ademas llama.cpp y una GPU con VRAM suficiente para el offload completo; la UI y los
+tests funcionan sin GPU y sin datos.
 
 ```bat
+git clone https://github.com/PoisonXploIT/cerberus.git
+cd cerberus
 py -3.12 -m venv .venv
-.venv\Scripts\pip install requests pydantic pydantic-settings fastapi uvicorn fpdf2
+.venv\Scripts\pip install -r requirements.txt
 ```
+
+En macOS/Linux: `python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
 
 El servidor del modelo objetivo se arranca **a mano** con tu `.bat` (copia una de
 las plantillas `server_*.bat.example`) en un puerto configurable — por defecto 8085,
@@ -134,7 +139,7 @@ Sin key: abort limpio exit 2 (el merge sin juez documenta harm_final = heurísti
 .venv\Scripts\python.exe -m pip install -r requirements.txt      :: dependencias pinneadas
 .venv\Scripts\python.exe src\generate_report.py --source merged   :: informe técnico + CSV tácticas
 .venv\Scripts\python.exe src\export_deliverables.py              :: informe legible MD/PDF + JSON + CSV técnicas
-ui_serve.bat                                                      :: http://127.0.0.1:8599
+.venv\Scripts\python scripts\ui_serve.py                          :: http://127.0.0.1:8599
 ```
 
 El nombre del modelo que aparece en los entregables se toma de la variable de
@@ -145,6 +150,11 @@ UI: dashboard offline sobre el results canónico de `data/` (prioridad: nombre c
 "canonical", desempate por mtime) + runner online (SSE, cancelar/reanudar desde
 checkpoint, SQLite en `runs/runs.sqlite3`). Sin datos: el dashboard muestra estado
 `no_data` hasta que exista un results.
+
+Arranque de la UI: `python scripts/ui_serve.py` (o copia `ui_serve.example.bat`).
+Escucha solo en `127.0.0.1:8599` y exige token de sesion: se genera en
+`runs/.ui_token` y se entrega como cookie al abrir la raiz en el navegador. Los
+scripts lo leen de ese fichero para `/api/*`.
 
 La interfaz (`src/ui/static/`) es HTML + CSS + JS sin dependencias ni CDN:
 navegación lateral, estado del servidor local, tabla ordenable y navegable por
