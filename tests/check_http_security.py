@@ -76,6 +76,9 @@ def main() -> int:
 
     check("reports/info", call("/api/reports/info")[0], 200)
     check("events sin token", call(f"/events/run/{RID}", token=False)[0], 401)
+    check("history", call("/api/history")[0], 200)
+    check("borrar run inexistente", call("/api/run/no_existe_123", "DELETE")[0], 404)
+    check("borrar run_id invalido", call("/api/run/..%2Fescape", "DELETE")[0], (400, 404, 405))
 
     print("\nRESULTADO:", "OK" if fallos == 0 else f"{fallos} fallos")
     return 0 if fallos == 0 else 1

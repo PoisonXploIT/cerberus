@@ -147,10 +147,17 @@ checkpoint, SQLite en `runs/runs.sqlite3`). Sin datos: el dashboard muestra esta
 `no_data` hasta que exista un results.
 
 La interfaz (`src/ui/static/`) es HTML + CSS + JS sin dependencias ni CDN:
-navegación lateral, panel de estado del servidor local, tabla ordenable y navegable
-por teclado, detalle en panel lateral con pestañas (prompt / respuesta / métricas),
-confirmación en acciones destructivas, informes con tamaño y fecha, y exportación
-CSV de la comparativa. Tema oscuro y claro; favicon e icono propios.
+navegación lateral, estado del servidor local, tabla ordenable y navegable por
+teclado, detalle en panel lateral con pestañas (prompt / respuesta / métricas) y
+foco atrapado, historial de runs con acciones (ver, juzgar, reanudar, borrar),
+confirmación en acciones destructivas, informes con tamaño y fecha y exportación
+CSV de la comparativa. Tema oscuro y claro; icono de las tres cabezas y favicon
+propios.
+
+Endpoints de la UI: `/api/stats`, `/api/results[/{i}]`, `/api/runs`, `/api/history`,
+`/api/run` (POST), `/api/run/{id}/cancel|resume|judge`, `DELETE /api/run/{id}`,
+`/api/local/status`, `/api/config/judge`, `/api/reports[/info|/all|/{key}]` y
+`/events/run/{id}` (SSE).
 
 ## Seguridad
 
@@ -172,7 +179,11 @@ CSV de la comparativa. Tema oscuro y claro; favicon e icono propios.
   (un run y un juez).
 - Cabeceras `Content-Security-Policy` (script-src estricto), `nosniff`,
   `no-referrer`, `frame-ancestors none` y `Cache-Control: no-store` en `/api/*`.
-- Logs sin prompts completos por defecto (debug opt-in); llama.cpp con logs saneados.
+- **Sanitizado por defecto** en el detalle: oculta bloques de código, comandos
+  inline, IPs, hashes, dominios y blobs largos (best-effort para demos, no es una
+  garantía).
+- Logs sin prompts ni respuestas: `logs/ui.log` con rotación (1 MB x 3) registra
+  arranque, runs, borrados y errores por `run_id`.
 - Modelo local aislado: sin red de producción, sin sistemas reales, sin ejecución de
   payloads.
 
@@ -187,7 +198,8 @@ Detalle del modelo de amenazas en `SECURITY.md`.
 ```
 
 `unittest` cubre validación de `run_id`, allowlist de URLs y comprobaciones de `Host`.
-`check_http_security.py` verifica en vivo token, cabeceras, traversal y SSRF.
+`check_http_security.py` verifica en vivo token, cabeceras, traversal, SSRF,
+historial y borrado.
 `sanity_check.py` comprueba que no haya nombres reales de modelo ni keys en el árbol.
 CI (`.github/workflows/ci.yml`) ejecuta compilación, tests y `sanity_check` en cada
 push.

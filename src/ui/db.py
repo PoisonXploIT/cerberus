@@ -89,6 +89,12 @@ def list_runs(limit: int = 50) -> list[dict]:
     return out
 
 
+def delete_run(run_id: str) -> None:
+    """Borra la fila del historial (los ficheros los borra el endpoint)."""
+    with _conn() as c:
+        c.execute("DELETE FROM runs WHERE run_id=?", (run_id,))
+
+
 def recover_orphans() -> int:
     """Al arrancar la UI: los runs 'pending'/'running' de una sesión anterior son huérfanos.
 

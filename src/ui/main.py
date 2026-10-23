@@ -25,6 +25,7 @@ from api.compare import router as compare_router  # noqa: E402
 from api.runner import router as runner_router  # noqa: E402
 from api.stats import router as stats_router  # noqa: E402
 import security  # noqa: E402
+from logging_setup import get_logger, setup_logging  # noqa: E402
 from db import recover_orphans  # noqa: E402
 from home import reports_dir  # noqa: E402
 
@@ -41,6 +42,8 @@ REPORTS = {
 
 
 def create_app() -> FastAPI:
+    log = setup_logging()
+    get_logger("app").info("UI arrancada; log en %s", log)
     # Runs huérfanos de una sesión anterior (la UI se reinició con un run en curso).
     n = recover_orphans()
     if n:

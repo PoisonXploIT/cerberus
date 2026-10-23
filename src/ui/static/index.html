@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="CERBERUS: evaluacion local de modelos LLM frente a tecnicas MITRE ATT&CK. Herramienta defensiva, sin ejecucion de payloads.">
   <meta name="color-scheme" content="dark light">
+  <meta name="cerberus-ui-version" content="3">
   <meta name="theme-color" content="#0b0e12" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f2f4f7" media="(prefers-color-scheme: light)">
   <title>CERBERUS — evaluacion MITRE ATT&amp;CK de LLM locales</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/style.css">
-  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/style.css?v=3">
+  <script src="/theme.js?v=3"></script>
 </head>
 <body>
   <a class="skip" href="#main">Saltar al contenido</a>
 
   <header class="topbar">
     <div class="brand">
-      <img src="/cerberus.svg" width="30" height="30" alt="">
+      <img src="/cerberus.svg" width="36" height="36" alt="">
       <div class="brand-text">
         <span class="name">CERBERUS</span>
         <span class="sub">evaluacion MITRE ATT&amp;CK de LLM locales</span>
@@ -38,6 +39,7 @@
       <a href="#overview" class="active">Resumen</a>
       <a href="#results">Resultados</a>
       <a href="#runner">Runner</a>
+      <a href="#history">Historial</a>
       <a href="#compare">Comparar</a>
       <a href="#reports">Informes</a>
       <a href="#help">Ayuda</a>
@@ -188,6 +190,30 @@
         </div>
       </section>
 
+      <section id="history" aria-labelledby="h-history">
+        <div class="sec-head">
+          <h2 id="h-history">Historial</h2>
+          <span class="chip" id="hist-count">—</span>
+          <button id="btn-hist-refresh" class="btn ghost small" type="button">Actualizar</button>
+        </div>
+        <div class="panel tablewrap">
+          <table id="history-table">
+            <caption class="sr-only">Historial de ejecuciones</caption>
+            <thead>
+              <tr>
+                <th scope="col">Run</th>
+                <th scope="col">Estado</th>
+                <th scope="col" class="num">Prompts</th>
+                <th scope="col" class="num">Harm medio</th>
+                <th scope="col">Inicio</th>
+                <th scope="col">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="compare" aria-labelledby="h-compare">
         <div class="sec-head">
           <h2 id="h-compare">Comparar runs</h2>
@@ -292,7 +318,7 @@
     </div>
 
     <div class="drawer-tools">
-      <label class="check"><input type="checkbox" id="sanitize-toggle" checked> Ocultar bloques de codigo</label>
+      <label class="check"><input type="checkbox" id="sanitize-toggle" checked> Ocultar codigo, comandos e IOCs</label>
       <label class="check"><input type="checkbox" id="demo-toggle"> Modo demo (solo metricas)</label>
     </div>
 
@@ -332,6 +358,6 @@
 
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=3"></script>
 </body>
 </html>

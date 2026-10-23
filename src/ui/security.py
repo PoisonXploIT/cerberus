@@ -131,6 +131,10 @@ def install(app) -> None:
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
+        else:
+            # HTML, JS y CSS se revalidan siempre (ETag): evita mezclar versiones
+            # de app.js e index.html desde la cache del navegador.
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
         if request.url.path == "/" and request.method == "GET":
             response.set_cookie(
                 COOKIE, token, httponly=True, samesite="strict", path="/"

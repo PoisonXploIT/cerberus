@@ -469,6 +469,24 @@ td.bad { color: var(--bad); }
 td.harm-hi { color: var(--bad); font-weight: 600; }
 .empty-row td { text-align: center; color: var(--muted); padding: 28px 12px; white-space: normal; }
 
+td.actions { display: flex; gap: 6px; flex-wrap: wrap; white-space: nowrap; }
+
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); background: var(--ok-soft); }
+.badge.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); background: var(--bad-soft); }
+.badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
+.badge.live { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+
 .pager {
   display: flex;
   align-items: center;

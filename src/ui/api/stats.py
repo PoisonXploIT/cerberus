@@ -88,11 +88,26 @@ def load_rows(path: Path) -> list[dict]:
     return rows
 
 
-def sanitize_response(text: str) -> str:
-    """Oculta el contenido de los bloques de código (```...```) en modo demo.
+_INLINE_CMD = re.compile(
+    r"`[^`\n]*(?:powershell|pwsh|cmd(?:\.exe)?\s|/c\s|bash|Invoke-[A-Za-z]+|IEX|"
+    r"mshta|certutil|bitsadmin|wmic)[^`\n]*`",
+    re.IGNORECASE,
+)
+_IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+_HASH = re.compile(r"\b[a-f0-9]{32,64}\b", re.IGNORECASE)
+_DOMAIN = re.compile(
+    r"\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
+    r"(?:com|net|org|io|info|biz|ru|cn|xyz|top|onion|local|internal)\b",
+    re.IGNORECASE,
+)
+_BLOB = re.compile(r"\b[A-Za-z0-9+/=]{60,}\b")
 
-    Conserva cabeceras, explicaciones y la firma del bloque; solo se sustituye
-    el cuerpo de cada bloque por un marcador con el número de líneas ocultas.
+
+def sanitize_response(text: str) -> str:
+    """Oculta material accionable: bloques de codigo, comandos inline e IOCs.
+
+    Redaccion best-effort para demos y capturas, no una garantia: el detalle
+    completo sigue disponible desactivando el toggle.
     """
     out: list[str] = []
     in_fence = False
@@ -105,16 +120,21 @@ def sanitize_response(text: str) -> str:
                 out.append(line)
                 hidden = 0
             else:
-                out.append(f"[{hidden} lineas de codigo ocultas - modo sanitizado]")
+                out.append(f"[{hidden} lineas de codigo ocultas]")
                 out.append("```")
                 in_fence = False
             continue
         if in_fence:
             hidden += 1
-        else:
-            out.append(line)
-    if in_fence and hidden:  # bloque sin cerrar al final
-        out.append(f"[{hidden} lineas de codigo ocultas - modo sanitizado]")
+            continue
+        clean = _INLINE_CMD.sub("[comando oculto]", line)
+        clean = _IP.sub("[ip]", clean)
+        clean = _HASH.sub("[hash]", clean)
+        clean = _DOMAIN.sub("[dominio]", clean)
+        clean = _BLOB.sub("[blob]", clean)
+        out.append(clean)
+    if in_fence and hidden:
+        out.append(f"[{hidden} lineas de codigo ocultas]")
     return "\n".join(out)
 
 

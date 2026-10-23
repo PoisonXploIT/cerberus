@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import queue
+import shutil
 import sys
 import threading
 import time
@@ -41,7 +42,9 @@ from run_mitre_eval import (  # noqa: E402
     run_pipeline,
 )
 
-from db import create_run, get_run, list_runs, set_status  # noqa: E402
+from db import create_run, delete_run, get_run, list_runs, set_status  # noqa: E402
+from home import runs_dir  # noqa: E402
+from logging_setup import get_logger  # noqa: E402
 from paths import InvalidRunId, run_dir as safe_run_dir, validate_run_id  # noqa: E402
 from urls import BadUrl, validate_judge_base_url, validate_local_base_url  # noqa: E402
 
@@ -58,6 +61,7 @@ class _Run:
 
 ACTIVE: dict[str, _Run] = {}
 _LOCK = threading.Lock()
+log = get_logger("runner")
 MAX_ACTIVE = 2  # un run y un juez a la vez; mas seria competir por la GPU
 
 
@@ -77,6 +81,7 @@ def _worker(run_id: str) -> None:
             elif t == "done":
                 terminal = "completed"
                 set_status(run_id, "completed", summary=ev["summary"])
+                log.info("run %s completado: %s", run_id, ev["summary"].get("total"))
             elif t == "abort":
                 terminal = "aborted"
                 set_status(run_id, "aborted")
@@ -91,6 +96,7 @@ def _worker(run_id: str) -> None:
             r.q.put({"type": "cancelled", "done": done_n, "run_id": run_id})
             set_status(run_id, "cancelled")
     except Exception as e:  # noqa: BLE001 — se publica al cliente por SSE
+        log.exception("run %s fallo: %s", run_id, e)
         set_status(run_id, "error", summary={"error": str(e)})
         r.q.put({"type": "error", "reason": str(e), "run_id": run_id})
     finally:
@@ -209,6 +215,7 @@ def start_run(body: RunRequest) -> dict:
                         "temperature": body.temperature, "modelos_servidor": models,
                         "local_base_url": s.local_base_url})
     r.thread.start()
+    log.info("run %s iniciado (limit=%s, max_tokens=%s)", run_id, body.limit, body.max_tokens)
     return {"run_id": run_id, "events": f"/events/run/{run_id}"}
 
 
@@ -284,6 +291,92 @@ def runs(limit: int = 50) -> list[dict]:
             d["live"] = True
         out.append(d)
     return out
+
+
+_HIST_CACHE: dict[str, tuple[float, int, float]] = {}
+
+
+def _scan_run(run_id: str) -> tuple[int, float]:
+    """(prompts, harm medio) leyendo results.jsonl; cacheado por mtime."""
+    path = _run_dir(run_id) / "results.jsonl"
+    if not path.exists():
+        return 0, 0.0
+    mtime = path.stat().st_mtime
+    cached = _HIST_CACHE.get(run_id)
+    if cached and cached[0] == mtime:
+        return cached[1], cached[2]
+    n = 0
+    total = 0.0
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            n += 1
+            total += row.get("metricas", {}).get("harm_score", 0.0) or 0.0
+    mean = round(total / n, 3) if n else 0.0
+    _HIST_CACHE[run_id] = (mtime, n, mean)
+    return n, mean
+
+
+@router.get("/api/history")
+def history(limit: int = 40) -> list[dict]:
+    """Historial unificado: corridas de la BD y del disco, con metricas basicas."""
+    rows: dict[str, dict] = {}
+    for row in list_runs(limit):
+        rows[row["run_id"]] = {
+            "run_id": row["run_id"],
+            "status": row["status"],
+            "started_at": row["started_at"],
+            "prompts": row.get("checkpoint_idx") or 0,
+            "harm_mean": None,
+            "in_db": True,
+            "modelo": (row.get("summary") or {}).get("modelo_local")
+                      or (row.get("config") or {}).get("modelos_servidor", [None])[0],
+        }
+    base = runs_dir()
+    if base.is_dir():
+        for d in sorted(base.iterdir(), reverse=True):
+            if not (d.is_dir() and (d / "results.jsonl").is_file()):
+                continue
+            rid = d.name
+            try:
+                n, mean = _scan_run(rid)
+            except InvalidRunId:
+                continue
+            item = rows.setdefault(rid, {
+                "run_id": rid, "status": "en disco", "started_at": None,
+                "prompts": n, "harm_mean": mean, "in_db": False, "modelo": None,
+            })
+            if item["harm_mean"] is None:
+                item["harm_mean"] = mean
+            if not item["prompts"]:
+                item["prompts"] = n
+    out = list(rows.values())
+    out.sort(key=lambda r: (r["started_at"] or ""), reverse=True)
+    for r in out:
+        r["live"] = r["run_id"] in ACTIVE
+    return out[:limit]
+
+
+@router.delete("/api/run/{run_id}")
+def delete_run_endpoint(run_id: str) -> dict:
+    """Borra un run del historial y del disco. Nunca toca un run en curso."""
+    try:
+        path = _run_dir(run_id)
+    except InvalidRunId as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if run_id in ACTIVE:
+        raise HTTPException(status_code=409, detail="el run esta en curso; cancelalo antes")
+    existed = path.exists()
+    if not existed and get_run(run_id) is None:
+        raise HTTPException(status_code=404, detail=f"run desconocido: {run_id}")
+    if existed:
+        shutil.rmtree(path)
+    delete_run(run_id)
+    log.warning("run %s borrado del disco y del historial", run_id)
+    _HIST_CACHE.pop(run_id, None)
+    return {"ok": True, "deleted": run_id}
 
 
 @router.get("/api/local/status")

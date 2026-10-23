@@ -8,6 +8,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 const PAGE_SIZE = 50;
 const MAX_CONSOLE_LINES = 400;
+const UI_VERSION = "3";
 
 const state = {
   rows: [],
@@ -433,7 +434,8 @@ async function openDrawer(i) {
 
 function closeDrawer() {
   const idx = state.detailIdx;
-  $("drawer").hidden = true;
+  const drawer = $("drawer");
+  drawer.hidden = true;
   document.body.classList.remove("drawer-open");
   state.detailIdx = null;
   const row = idx === null ? null : document.querySelector(`tr[data-i="${idx}"]`);
@@ -441,8 +443,27 @@ function closeDrawer() {
   renderTable();
 }
 
+function trapTab(ev) {
+  if (ev.key !== "Tab") return;
+  const nodes = $("drawer").querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+  );
+  const list = [...nodes].filter((e) => e.offsetParent !== null);
+  if (!list.length) return;
+  const first = list[0];
+  const last = list[list.length - 1];
+  if (ev.shiftKey && document.activeElement === first) {
+    ev.preventDefault();
+    last.focus();
+  } else if (!ev.shiftKey && document.activeElement === last) {
+    ev.preventDefault();
+    first.focus();
+  }
+}
+
 function initDrawer() {
   $("drawer-close").addEventListener("click", closeDrawer);
+  $("drawer").addEventListener("keydown", trapTab);
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape" && !$("drawer").hidden) closeDrawer();
   });
@@ -617,6 +638,7 @@ function attachStream(runId) {
 async function afterRun(runId) {
   await refreshRuns();
   await loadDashboard(runId);
+  loadHistory();
   const sel = $("f-run");
   if (![...sel.options].some((o) => o.value === runId)) sel.appendChild(new Option(runId, runId));
   sel.value = runId;
@@ -871,6 +893,125 @@ async function loadReports() {
   }
 }
 
+/* ----------------------------------------------------------------- historial */
+
+const STATUS_LABEL = {
+  completed: "completado", error: "error", cancelled: "cancelado",
+  aborted: "abortado", pending: "pendiente", running: "en curso",
+  "en disco": "en disco",
+};
+const STATUS_CLASS = {
+  completed: "ok", error: "bad", cancelled: "warn", aborted: "warn",
+  running: "live", pending: "live", "en disco": "",
+};
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("es-ES", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function actionBtn(label, act, runId) {
+  const b = el("button", label, "btn ghost small");
+  b.type = "button";
+  b.dataset.act = act;
+  b.dataset.run = runId;
+  return b;
+}
+
+async function loadHistory() {
+  const body = $("history-body");
+  if (!body) return;
+  let rows = [];
+  try {
+    rows = await api("/api/history");
+  } catch (e) {
+    toast("No se pudo cargar el historial: " + e.message, "bad");
+    return;
+  }
+  state.history = rows;
+  body.textContent = "";
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.appendChild(el("td", r.run_id));
+    const tdSt = document.createElement("td");
+    const badge = el("span", STATUS_LABEL[r.status] || r.status, "badge " + (STATUS_CLASS[r.status] || ""));
+    if (r.live) badge.classList.add("live");
+    tdSt.appendChild(badge);
+    tr.appendChild(tdSt);
+    tr.appendChild(el("td", fmtInt(r.prompts), "num"));
+    tr.appendChild(el("td", r.harm_mean === null || r.harm_mean === undefined ? "—" : fmtNum(r.harm_mean), "num"));
+    tr.appendChild(el("td", fmtDate(r.started_at)));
+
+    const tdAct = el("td", undefined, "actions");
+    tdAct.appendChild(actionBtn("Ver", "view", r.run_id));
+    if (state.judge.configured) tdAct.appendChild(actionBtn("Juzgar", "judge", r.run_id));
+    if (r.in_db && ["cancelled", "aborted", "error"].includes(r.status)) {
+      tdAct.appendChild(actionBtn("Reanudar", "resume", r.run_id));
+    }
+    const del = actionBtn("Borrar", "delete", r.run_id);
+    del.classList.add("danger");
+    if (r.live) del.disabled = true;
+    tdAct.appendChild(del);
+    tr.appendChild(tdAct);
+
+    body.appendChild(tr);
+  }
+  $("hist-count").textContent = `${rows.length} runs`;
+}
+
+async function deleteRun(runId) {
+  const ok = await confirmAction(
+    "Borrar run",
+    `Se eliminan la carpeta runs\\${runId} y su fila del historial. No se puede deshacer.`
+  );
+  if (!ok) return;
+  try {
+    await api(`/api/run/${encodeURIComponent(runId)}`, { method: "DELETE" });
+    toast("Run borrado: " + runId, "ok");
+    await Promise.all([loadHistory(), refreshRuns()]);
+    if (state.source === runId) await loadDashboard(null);
+  } catch (e) {
+    toast("No se pudo borrar: " + e.message, "bad", 7000);
+  }
+}
+
+async function resumeById(runId) {
+  try {
+    await api(`/api/run/${encodeURIComponent(runId)}/resume`, { method: "POST" });
+    setRunButtons(true);
+    attachStream(runId);
+    toast("Reanudando " + runId, "ok");
+  } catch (e) {
+    toast("No se pudo reanudar: " + e.message, "bad", 7000);
+  }
+}
+
+function initHistory() {
+  $("btn-hist-refresh").addEventListener("click", () => loadHistory());
+  $("history-body").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-act]");
+    if (!b || b.disabled) return;
+    const act = b.dataset.act;
+    const run = b.dataset.run;
+    if (act === "view") {
+      loadDashboard(run);
+      $("f-run").value = run;
+      document.getElementById("results").scrollIntoView({ block: "start" });
+    } else if (act === "judge") {
+      startJudge(run);
+    } else if (act === "resume") {
+      resumeById(run);
+    } else if (act === "delete") {
+      deleteRun(run);
+    }
+  });
+}
+
 /* -------------------------------------------------------------------- init */
 
 function fillTacticOptions(tactics) {
@@ -900,13 +1041,24 @@ async function loadJudgeConfig() {
   }
 }
 
+function checkUiVersion() {
+  const meta = document.querySelector('meta[name="cerberus-ui-version"]');
+  if (!meta || meta.content !== UI_VERSION) {
+    showBanner("La interfaz esta mezclando versiones en cache. Pulsa Ctrl+F5 para recargar sin cache.");
+    return false;
+  }
+  return true;
+}
+
 async function boot() {
+  if (!checkUiVersion()) return;
   initTheme();
   initNav();
   initTable();
   initDrawer();
   initRunner();
   initCompare();
+  initHistory();
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape" && !$("drawer").hidden) closeDrawer();
   });
@@ -922,6 +1074,7 @@ async function boot() {
   }
   refreshRuns().catch(() => {});
   loadReports().catch(() => {});
+  loadHistory().catch(() => {});
 }
 
 document.addEventListener("DOMContentLoaded", boot);

@@ -1,10 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="CERBERUS">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="CERBERUS">
   <defs>
-    <linearGradient id="amber" x1="0" y1="0" x2="0.4" y2="1">
-      <stop offset="0" stop-color="#f9d478"/>
-      <stop offset="1" stop-color="#d99a1c"/>
+    <linearGradient id="fur" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#fadf95"/>
+      <stop offset="0.55" stop-color="#efb43f"/>
+      <stop offset="1" stop-color="#cf8f16"/>
     </linearGradient>
   </defs>
-  <path d="M16 2.6 26.6 6.2v9.4c0 6.7-5.1 10.9-10.6 13.8C10.5 26.5 5.4 22.3 5.4 15.6V6.2z" fill="url(#amber)"/>
-  <path d="M12.2 11.4v9.2M16 9.6v12.4M19.8 11.4v9.2" stroke="#0d1014" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>
+
+  <!-- Tres cabezas de perro guardián que miran en tres direcciones.
+       Cada cabeza: cuello, dos orejas puntiagudas, hocico y ojo. -->
+  <g transform="translate(32 52)" stroke="#0b0e12" stroke-width="1.6" stroke-linejoin="round">
+    <g transform="rotate(-34)">
+      <path d="M-6 0 L-8 -13 L-13 -23 L-7 -19 L-3 -29 L0 -37 L3 -29 L7 -19 L13 -23 L8 -13 L6 0 Z" fill="url(#fur)"/>
+      <circle cx="-4.2" cy="-20" r="1.7" fill="#0b0e12" stroke="none"/>
+      <circle cx="4.2" cy="-20" r="1.7" fill="#0b0e12" stroke="none"/>
+      <path d="M-3.4 -30 L3.4 -30" stroke="#0b0e12" stroke-width="1.4" fill="none"/>
+    </g>
+    <g>
+      <path d="M-6 0 L-8 -13 L-13 -23 L-7 -19 L-3 -29 L0 -37 L3 -29 L7 -19 L13 -23 L8 -13 L6 0 Z" fill="url(#fur)"/>
+      <circle cx="-4.2" cy="-20" r="1.7" fill="#0b0e12" stroke="none"/>
+      <circle cx="4.2" cy="-20" r="1.7" fill="#0b0e12" stroke="none"/>
+      <path d="M-3.4 -30 L3.4 -30" stroke="#0b0e12" stroke-width="1.4" fill="none"/>
+    </g>
+    <g transform="rotate(34)">
+      <path d="M-6 0 L-8 -13 L-13 -23 L-7 -19 L-3 -29 L0 -37 L3 -29 L7 -19 L13 -23 L8 -13 L6 0 Z" fill="url(#fur)"/>
+      <circle cx="-4.2" cy="-20" r="1.7" fill="#0b0e12" stroke="none"/>
+      <circle cx="4.2" cy="-20" r="1.7" fill="#0b0e12" stroke="none"/>
+      <path d="M-3.4 -30 L3.4 -30" stroke="#0b0e12" stroke-width="1.4" fill="none"/>
+    </g>
+    <!-- Collar: base común de las tres cabezas -->
+    <path d="M-9 1 Q0 7 9 1 L9 6 Q0 12 -9 6 Z" fill="#0b0e12" stroke="none" opacity=".9"/>
+  </g>
 </svg>
