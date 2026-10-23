@@ -48,3 +48,6 @@ SEGUIMIENTO.md
 
 # Configuracion local del publicador (rutas de este equipo)
 config/publish.json
+
+# Estado local de wrangler (deploys)
+.wrangler/
